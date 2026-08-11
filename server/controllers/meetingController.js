@@ -132,3 +132,54 @@ export const meetingWebhook = async (req, res) => {
     res.status(500).send('Server error');
   }
 };
+
+export const searchMeetings = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      const meetings = await Meeting.find({ userId: req.user.id }).sort({ date: -1 });
+      return res.json(meetings);
+    }
+    
+    const regex = new RegExp(query, 'i');
+    
+    const meetings = await Meeting.find({
+      userId: req.user.id,
+      $or: [
+        { title: regex },
+        { summary: regex },
+        { keyPoints: regex },
+        { decisions: regex },
+        { risks: regex }
+      ]
+    }).sort({ date: -1 });
+
+    res.json(meetings);
+  } catch (err) {
+    console.error('Error searching meetings:', err);
+    res.status(500).send('Server error');
+  }
+};
+
+export const deleteMeeting = async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+
+    if (meeting.userId.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    // Delete associated action items
+    await ActionItem.deleteMany({ meetingId: meeting._id });
+
+    // Delete meeting from DB
+    await Meeting.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Meeting deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting meeting:', err);
+    res.status(500).send('Server error');
+  }
+};
+

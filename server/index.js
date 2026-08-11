@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import connectDB from './config/db.js';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,8 +10,6 @@ const __dirname = path.dirname(__filename);
 import authRoutes from './routes/auth.js';
 import meetingRoutes from './routes/meetings.js';
 import actionItemRoutes from './routes/actionItems.js';
-
-dotenv.config();
 
 const app = express();
 
@@ -26,7 +24,7 @@ app.use('/api/action-items', actionItemRoutes);
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(path.resolve(__dirname, '../client', 'dist', 'index.html'));
 });
 

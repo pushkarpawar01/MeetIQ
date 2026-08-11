@@ -5,7 +5,9 @@ import {
   updateMeetingStatus,
   getMeetings,
   getMeetingById,
-  meetingWebhook
+  meetingWebhook,
+  searchMeetings,
+  deleteMeeting
 } from '../controllers/meetingController.js';
 
 const router = express.Router();
@@ -20,6 +22,11 @@ router.post('/upload-url', auth, getUploadUrl);
 // @access  Private
 router.put('/:id/status', auth, updateMeetingStatus);
 
+// @route   GET /api/meetings/search
+// @desc    Search user's meetings by keyword
+// @access  Private
+router.get('/search', auth, searchMeetings);
+
 // @route   GET /api/meetings
 // @desc    Get all meetings for user
 // @access  Private
@@ -29,6 +36,11 @@ router.get('/', auth, getMeetings);
 // @desc    Get single meeting by ID
 // @access  Private
 router.get('/:id', auth, getMeetingById);
+
+// @route   DELETE /api/meetings/:id
+// @desc    Delete meeting and associated action items
+// @access  Private
+router.delete('/:id', auth, deleteMeeting);
 
 // @route   POST /api/meetings/webhook
 // @desc    Webhook for AWS Lambda to send processed meeting intelligence
