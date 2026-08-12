@@ -30,10 +30,16 @@ export const handler = async (event) => {
       const fileUri = `s3://${bucket}/${key}`;
       const mediaFormat = key.substring(key.lastIndexOf('.') + 1).toLowerCase();
 
+      // Detect format — Transcribe supports mp3, mp4, wav, flac, ogg, webm, amr
+      const supportedFormats = ['mp3', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr'];
+      const resolvedFormat = supportedFormats.includes(mediaFormat) ? mediaFormat : 'mp4';
+
       await transcribeClient.send(new StartTranscriptionJobCommand({
         TranscriptionJobName: jobName,
-        LanguageCode: "en-US",
-        MediaFormat: mediaFormat === 'mp4' ? 'mp4' : (mediaFormat === 'wav' ? 'wav' : 'mp3'),
+        // Auto-detect language — supports Hindi (hi-IN), English, and 100+ others
+        IdentifyLanguage: true,
+        LanguageOptions: ["en-US", "hi-IN", "en-IN", "en-GB"],
+        MediaFormat: resolvedFormat,
         Media: { MediaFileUri: fileUri }
       }));
 
@@ -61,30 +67,34 @@ export const handler = async (event) => {
       const transcriptData = await transcriptRes.json();
       const transcriptText = transcriptData.results.transcripts[0].transcript;
 
-      console.log(`Transcript extracted (${transcriptText.length} chars). Invoking Amazon Bedrock...`);
+      console.log(`Transcript extracted (${transcriptText.length} chars). Invoking Amazon Bedrock (Titan)...`);
 
-      // 4. Send Transcript to Amazon Bedrock (Claude 3 Haiku)
-      const prompt = `You are an expert executive meeting assistant. Analyze the following meeting transcript and respond ONLY with a raw JSON object (no markdown, no backticks, no code blocks) containing these exact fields:
-- summary: string (concise summary of the meeting)
-- keyPoints: string[] (list of important points discussed)
-- decisions: string[] (list of key decisions made)
-- risks: string[] (list of potential risks or concerns raised)
-- unresolvedQuestions: string[] (open questions that need follow-up)
-- actionItems: object[] (each having: "task", "assigned_to", "deadline", "priority" [High/Medium/Low])
+      // 4. Send Transcript to Amazon Bedrock (Amazon Titan — no subscription required)
+      // Note: The transcript may be in any language (Hindi, English, etc.).
+      // Instruct Bedrock to ALWAYS respond with the JSON fields in English.
+      const prompt = `You are an expert executive meeting assistant. The following transcript may be in any language (e.g. Hindi, English, etc.).
+Analyze it and respond ONLY with a raw JSON object written in ENGLISH (no markdown, no backticks, no code blocks) containing these exact fields:
+- summary: string (concise summary of the meeting, in English)
+- keyPoints: string[] (list of important points discussed, in English)
+- decisions: string[] (list of key decisions made, in English)
+- risks: string[] (list of potential risks or concerns raised, in English)
+- unresolvedQuestions: string[] (open questions that need follow-up, in English)
+- actionItems: object[] (each having: "task", "assigned_to", "deadline", "priority" [High/Medium/Low], all in English)
 
 Transcript:
 ${transcriptText}`;
 
       const bedrockPayload = {
-        anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 2000,
-        messages: [
-          { role: "user", content: prompt }
-        ]
+        inputText: prompt,
+        textGenerationConfig: {
+          maxTokenCount: 2000,
+          temperature: 0.3,
+          topP: 0.9
+        }
       };
 
       const bedrockRes = await bedrockClient.send(new InvokeModelCommand({
-        modelId: "anthropic.claude-3-haiku-20240307-v1:0",
+        modelId: "amazon.titan-text-express-v1",
         contentType: "application/json",
         accept: "application/json",
         body: JSON.stringify(bedrockPayload)
@@ -92,11 +102,27 @@ ${transcriptText}`;
 
       const bedrockResponseText = new TextDecoder().decode(bedrockRes.body);
       const bedrockData = JSON.parse(bedrockResponseText);
-      const rawContent = bedrockData.content[0].text.trim();
+      const rawContent = bedrockData.results[0].outputText.trim();
 
-      // Clean markdown codeblocks if model wraps output
-      const jsonString = rawContent.replace(/^```json/, '').replace(/```$/, '').trim();
+      console.log("Bedrock raw output:", rawContent.substring(0, 300));
+
+      // Robust JSON extraction — Titan sometimes wraps JSON in explanatory text
+      // Try 1: strip markdown fences
+      let jsonString = rawContent.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+
+      // Try 2: extract first { ... } block if still not valid JSON
+      if (!jsonString.startsWith('{')) {
+        const match = rawContent.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('Bedrock did not return a valid JSON object. Raw output: ' + rawContent.substring(0, 200));
+        jsonString = match[0];
+      }
+
       const intelligence = JSON.parse(jsonString);
+
+      // Validate minimum required fields
+      if (!intelligence.summary) {
+        throw new Error('Bedrock returned JSON but summary field is missing or empty. Raw: ' + rawContent.substring(0, 200));
+      }
 
       console.log("Bedrock Intelligence Extracted successfully. Sending to Webhook...");
 

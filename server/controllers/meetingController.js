@@ -97,10 +97,17 @@ export const getMeetingById = async (req, res) => {
 
 export const meetingWebhook = async (req, res) => {
   try {
-    const { meetingId, summary, keyPoints, decisions, risks, unresolvedQuestions, actionItems } = req.body;
+    const { meetingId, status, summary, keyPoints, decisions, risks, unresolvedQuestions, actionItems } = req.body;
 
     const meeting = await Meeting.findById(meetingId);
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+
+    // Lambda signals explicit failure
+    if (status === 'FAILED' || !summary) {
+      meeting.status = 'FAILED';
+      await meeting.save();
+      return res.json({ message: 'Meeting marked as FAILED' });
+    }
 
     meeting.summary = summary;
     meeting.keyPoints = keyPoints || [];
