@@ -36,7 +36,7 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return navigate('/login');
-      const res = await fetch('http://localhost:5000/api/meetings', {
+      const res = await fetch('/api/meetings', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setMeetings(await res.json());
@@ -49,7 +49,7 @@ const Dashboard = () => {
     setIsSearching(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/search?query=${encodeURIComponent(q)}`, {
+      const res = await fetch(`/api/meetings/search?query=${encodeURIComponent(q)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setMeetings(await res.json());
@@ -76,7 +76,7 @@ const Dashboard = () => {
     setUploadProgress(10);
     const token = localStorage.getItem('token');
     try {
-      const urlRes = await fetch('http://localhost:5000/api/meetings/upload-url', {
+      const urlRes = await fetch('/api/meetings/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ title, filename: file.name, contentType: file.type })
@@ -93,7 +93,7 @@ const Dashboard = () => {
       if (!s3Res.ok) throw new Error('Failed to upload to S3');
       setUploadProgress(90);
 
-      await fetch(`http://localhost:5000/api/meetings/${meetingId}/status`, {
+      await fetch(`/api/meetings/${meetingId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ status: 'PROCESSING' })
@@ -112,7 +112,7 @@ const Dashboard = () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${id}`, {
+      const res = await fetch(`/api/meetings/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

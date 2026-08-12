@@ -12,7 +12,7 @@ const History = () => {
       const token = localStorage.getItem('token');
       if (!token) return navigate('/login');
       try {
-        const res = await fetch('http://localhost:5000/api/meetings', {
+        const res = await fetch('/api/meetings', {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) setMeetings(await res.json());
@@ -30,7 +30,7 @@ const History = () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${id}`, {
+      const res = await fetch(`/api/meetings/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

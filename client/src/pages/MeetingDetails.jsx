@@ -14,7 +14,7 @@ const MeetingDetails = () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/meetings/${id}`, {
+      const res = await fetch(`/api/meetings/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -37,7 +37,7 @@ const MeetingDetails = () => {
       if (!token) return navigate('/login');
 
       // Fetch meeting
-      const meetRes = await fetch(`http://localhost:5000/api/meetings/${id}`, {
+      const meetRes = await fetch(`/api/meetings/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -46,7 +46,7 @@ const MeetingDetails = () => {
       setMeeting(meetData);
 
       // Fetch action items
-      const actionRes = await fetch(`http://localhost:5000/api/action-items/meeting/${id}`, {
+      const actionRes = await fetch(`/api/action-items/meeting/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -67,7 +67,7 @@ const MeetingDetails = () => {
       const token = localStorage.getItem('token');
       const newStatus = item.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
       
-      const res = await fetch(`http://localhost:5000/api/action-items/${item._id}/status`, {
+      const res = await fetch(`/api/action-items/${item._id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
