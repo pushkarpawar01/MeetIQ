@@ -7,12 +7,16 @@ const navItems = [
   { to: '/profile',   icon: UserCircle,      label: 'Profile'   },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ onLogout }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate('/');
+    if (onLogout) {
+      onLogout();
+    } else {
+      localStorage.removeItem('token');
+    }
+    navigate('/login');
   };
 
   return (

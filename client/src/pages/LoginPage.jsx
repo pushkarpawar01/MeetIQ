@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bot, ArrowRight, Loader2 } from 'lucide-react';
 
-const LoginPage = () => {
+const LoginPage = ({ setToken }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +28,7 @@ const LoginPage = () => {
       }
 
       localStorage.setItem('token', data.token);
+      if (setToken) setToken(data.token);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);

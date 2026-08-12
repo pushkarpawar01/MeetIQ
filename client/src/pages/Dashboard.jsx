@@ -21,6 +21,7 @@ const Dashboard = () => {
 
   // Debounced search
   useEffect(() => {
+    if (searchQuery === '') return;
     clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
       if (searchQuery.trim()) {
