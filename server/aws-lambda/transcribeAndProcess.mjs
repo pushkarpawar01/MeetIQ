@@ -31,14 +31,16 @@ export const handler = async (event) => {
       const mediaFormat = key.substring(key.lastIndexOf('.') + 1).toLowerCase();
 
       // Detect format — Transcribe supports mp3, mp4, wav, flac, ogg, webm, amr
-      const supportedFormats = ['mp3', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr'];
-      const resolvedFormat = supportedFormats.includes(mediaFormat) ? mediaFormat : 'mp4';
+      let resolvedFormat = 'mp4';
+      if (['mp3', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr'].includes(mediaFormat)) {
+        resolvedFormat = mediaFormat;
+      } else if (mediaFormat === 'mpeg' || mediaFormat === 'mpg') {
+        resolvedFormat = 'mp4';
+      }
 
       await transcribeClient.send(new StartTranscriptionJobCommand({
         TranscriptionJobName: jobName,
-        // Auto-detect language — supports Hindi (hi-IN), English, and 100+ others
-        IdentifyLanguage: true,
-        LanguageOptions: ["en-US", "hi-IN", "en-IN", "en-GB"],
+        LanguageCode: "en-US", // Using English since IdentifyLanguage is restricted
         MediaFormat: resolvedFormat,
         Media: { MediaFileUri: fileUri }
       }));
@@ -151,7 +153,7 @@ ${transcriptText}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meetingId, status: 'FAILED' })
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
