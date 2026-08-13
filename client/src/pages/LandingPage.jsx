@@ -3,14 +3,14 @@ import { Bot, Mic, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white overflow-hidden selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#0B0F19] text-white overflow-hidden selection:bg-indigo-500 selection:text-white flex flex-col">
       {/* Background gradients */}
       <div className="fixed inset-0 z-0">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-[128px]"></div>
       </div>
 
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2">
           <div className="bg-gradient-to-br from-indigo-500 to-fuchsia-500 p-2 rounded-xl">
             <Bot className="w-6 h-6 text-white" />
@@ -27,7 +27,7 @@ const LandingPage = () => {
         </div>
       </nav>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pt-24 pb-32">
+      <main className="relative z-10 flex-1 max-w-7xl mx-auto px-6 pt-24 pb-32 w-full">
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
             <Sparkles className="w-4 h-4 text-fuchsia-400" />
@@ -57,12 +57,12 @@ const LandingPage = () => {
             {
               icon: <Mic className="w-6 h-6 text-indigo-400" />,
               title: "Smart Transcription",
-              desc: "Accurate speech-to-text with automatic speaker diarization using Amazon Transcribe."
+              desc: "Accurate speech-to-text with automatic language detection using AssemblyAI."
             },
             {
               icon: <Bot className="w-6 h-6 text-fuchsia-400" />,
               title: "AI Analysis",
-              desc: "Get intelligent summaries, key decisions, and identified risks powered by LLMs."
+              desc: "Get intelligent summaries, key decisions, and identified risks powered by Amazon Bedrock."
             },
             {
               icon: <CheckCircle2 className="w-6 h-6 text-rose-400" />,
@@ -80,8 +80,11 @@ const LandingPage = () => {
           ))}
         </div>
       </main>
+
+
     </div>
   );
 };
 
 export default LandingPage;
+
