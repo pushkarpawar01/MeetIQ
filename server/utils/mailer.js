@@ -2,11 +2,24 @@ import nodemailer from 'nodemailer';
 
 // EMAIL_SERVICE=gmail
 // EMAIL_USER=your_email@gmail.com
-// EMAIL_PASS=your_app_password
+// EMAIL_PASS=vazr eiun oily btkj   (spaces are fine, we strip them automatically)
+
+const createTransporter = () => {
+  const rawPass = process.env.EMAIL_PASS || '';
+  // Gmail App Passwords are 16 chars with optional spaces — strip them
+  const cleanPass = rawPass.replace(/\s/g, '');
+
+  return nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: cleanPass,
+    },
+  });
+};
+
 export const sendActionItemEmail = async (assignedTo, task, meetingTitle) => {
   try {
-    // Basic validation to ensure the assigned name looks like an email address.
-    // If Gemini just returns "John", we can't email "John". It must be "john@example.com".
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignedTo);
     if (!isEmail) {
       console.log(`⚠️ Cannot send email to "${assignedTo}" - not a valid email address.`);
@@ -14,17 +27,11 @@ export const sendActionItemEmail = async (assignedTo, task, meetingTitle) => {
     }
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log(`⚠️ Email credentials not found in .env. Skipping real email to ${assignedTo}`);
+      console.log(`⚠️ Email credentials not found in .env. Skipping email to ${assignedTo}`);
       return;
     }
 
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const transporter = createTransporter();
 
     await transporter.sendMail({
       from: `"MeetIQ Assistant" <${process.env.EMAIL_USER}>`,
@@ -42,8 +49,32 @@ export const sendActionItemEmail = async (assignedTo, task, meetingTitle) => {
       `,
     });
 
-    console.log(`✉️ Real email successfully sent to ${assignedTo}!`);
+    console.log(`✉️ Email successfully sent to ${assignedTo}!`);
   } catch (err) {
-    console.error('Failed to send real email:', err);
+    console.error(`❌ Failed to send email to ${assignedTo}:`, err.message);
   }
+};
+
+// Used by the test route to verify credentials work
+export const sendTestEmail = async () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('EMAIL_USER and EMAIL_PASS must be set in .env');
+  }
+
+  const transporter = createTransporter();
+
+  // Verify connection first — throws if credentials are wrong
+  await transporter.verify();
+
+  await transporter.sendMail({
+    from: `"MeetIQ Assistant" <${process.env.EMAIL_USER}>`,
+    to: process.env.EMAIL_USER, // Send to yourself as a test
+    subject: 'MeetIQ Email Test',
+    html: `
+      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <h2 style="color: #4f46e5;">✅ Email is working!</h2>
+        <p>Your MeetIQ action item notifications are configured correctly.</p>
+      </div>
+    `,
+  });
 };
