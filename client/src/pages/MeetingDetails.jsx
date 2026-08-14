@@ -103,7 +103,7 @@ const MeetingDetails = () => {
         setChatHistory(prev => [...prev, { role: 'ai', content: `Error: ${data.message}` }]);
       }
     } catch (err) {
-      setChatHistory(prev => [...prev, { role: 'ai', content: 'Failed to connect to chat service.' }]);
+      setChatHistory(prev => [...prev, { role: 'ai', content: `Connection error: ${err.message}` }]);
     } finally {
       setIsChatting(false);
     }

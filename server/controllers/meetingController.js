@@ -233,25 +233,32 @@ export const chatWithMeeting = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    if (!meeting.transcriptText) {
-      return res.status(400).json({ message: 'This meeting does not have a saved transcript for chatting.' });
-    }
-
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ message: 'GEMINI_API_KEY is not configured on the server.' });
     }
 
-    // Call Gemini to answer the question based on the transcript
-    const prompt = `You are an AI assistant answering questions about a meeting.
-Answer the user's question accurately using ONLY the information from the meeting transcript below.
-If the answer is not in the transcript, say "I cannot find the answer to that in the meeting transcript."
+    // Use full transcript if available, otherwise fall back to summary + key points
+    let context;
+    if (meeting.transcriptText) {
+      context = `Full Transcript:\n${meeting.transcriptText}`;
+    } else if (meeting.summary) {
+      // Fallback for meetings processed before the transcript-saving feature
+      context = `Meeting Summary:\n${meeting.summary}\n\nKey Points:\n${(meeting.keyPoints || []).join('\n')}\n\nDecisions:\n${(meeting.decisions || []).join('\n')}`;
+    } else {
+      return res.status(400).json({ message: 'This meeting has not been processed yet. Please wait for AI processing to complete.' });
+    }
 
-Transcript:
-${meeting.transcriptText}
+    const prompt = `You are an AI assistant answering questions about a meeting.
+Answer the user's question accurately using ONLY the information from the meeting context below.
+If the answer is not available, say "I cannot find the answer in the meeting data."
+
+${context}
 
 Question: ${question}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // Use the same model configured in env, matching the Lambda pipeline
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`;
     
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
@@ -262,16 +269,23 @@ Question: ${question}`;
     });
 
     if (!geminiRes.ok) {
-      throw new Error(`Gemini API error: ${geminiRes.status}`);
+      // Return the actual Gemini error to help debug
+      const errBody = await geminiRes.text();
+      console.error('Gemini API error body:', errBody);
+      return res.status(500).json({ message: `Gemini API error ${geminiRes.status}: ${errBody}` });
     }
 
     const data = await geminiRes.json();
-    const answer = data.candidates[0].content.parts[0].text;
+    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!answer) {
+      return res.status(500).json({ message: 'Gemini returned an empty response.' });
+    }
 
     res.json({ answer });
   } catch (err) {
     console.error('Error in chatWithMeeting:', err);
-    res.status(500).send('Server error');
+    res.status(500).json({ message: err.message || 'Server error' });
   }
 };
 
