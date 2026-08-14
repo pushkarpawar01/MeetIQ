@@ -7,7 +7,8 @@ import {
   getMeetingById,
   meetingWebhook,
   searchMeetings,
-  deleteMeeting
+  deleteMeeting,
+  chatWithMeeting
 } from '../controllers/meetingController.js';
 
 const router = express.Router();
@@ -41,6 +42,11 @@ router.get('/:id', auth, getMeetingById);
 // @desc    Delete meeting and associated action items
 // @access  Private
 router.delete('/:id', auth, deleteMeeting);
+
+// @route   POST /api/meetings/:id/chat
+// @desc    Chat with meeting transcript using Gemini RAG
+// @access  Private
+router.post('/:id/chat', auth, chatWithMeeting);
 
 // @route   POST /api/meetings/webhook
 // @desc    Webhook for AWS Lambda to send processed meeting intelligence

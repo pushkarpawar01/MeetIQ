@@ -9,6 +9,7 @@ const Dashboard = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [file, setFile] = useState(null);
+  const [attendees, setAttendees] = useState([]);
   const [uploadStatus, setUploadStatus] = useState('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,7 +99,7 @@ const Dashboard = () => {
       const urlRes = await fetchWithAuth('/api/meetings/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, filename: file.name, contentType: file.type })
+        body: JSON.stringify({ title, filename: file.name, contentType: file.type, attendees: attendees.filter(a => a.name) })
       });
       if (!urlRes.ok) throw new Error('Failed to get upload URL');
       const { uploadUrl, meetingId } = await urlRes.json();
@@ -145,8 +146,23 @@ const Dashboard = () => {
     setIsUploadOpen(false);
     setTitle('');
     setFile(null);
+    setAttendees([]);
     setUploadStatus('idle');
     setUploadProgress(0);
+  };
+
+  const addAttendee = () => {
+    setAttendees([...attendees, { name: '', email: '', contact: '' }]);
+  };
+
+  const updateAttendee = (index, field, value) => {
+    const newAttendees = [...attendees];
+    newAttendees[index][field] = value;
+    setAttendees(newAttendees);
+  };
+
+  const removeAttendee = (index) => {
+    setAttendees(attendees.filter((_, i) => i !== index));
   };
 
   const statusColors = {
@@ -299,6 +315,35 @@ const Dashboard = () => {
                       </div>
                     )}
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Meeting Attendees (For AI Action Item Assignment)</label>
+                  <div className="space-y-3 mb-3 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                    {attendees.map((att, i) => (
+                      <div key={i} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Name (e.g. John)"
+                          value={att.name}
+                          onChange={(e) => updateAttendee(i, 'name', e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                        />
+                        <input
+                          type="email"
+                          placeholder="Email (e.g. john@work.com)"
+                          value={att.email}
+                          onChange={(e) => updateAttendee(i, 'email', e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-indigo-500"
+                        />
+                        <button type="button" onClick={() => removeAttendee(i)} className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={addAttendee} className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                    <Plus className="w-3 h-3" /> Add Attendee
+                  </button>
                 </div>
               </div>
 

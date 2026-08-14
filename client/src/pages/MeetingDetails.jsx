@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, CheckCircle2, Circle, AlertTriangle, HelpCircle, FileText, LayoutDashboard, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, Circle, AlertTriangle, HelpCircle, FileText, LayoutDashboard, Trash2, MessageSquare, Send } from 'lucide-react';
 import { fetchWithAuth } from '../utils/api';
 
 const MeetingDetails = () => {
@@ -10,6 +10,9 @@ const MeetingDetails = () => {
   const [actionItems, setActionItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [chatInput, setChatInput] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isChatting, setIsChatting] = useState(false);
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
@@ -74,6 +77,35 @@ const MeetingDetails = () => {
       }
     } catch (err) {
       console.error('Error toggling status:', err);
+    }
+  };
+
+  const handleChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
+    setIsChatting(true);
+
+    try {
+      const res = await fetchWithAuth(`/api/meetings/${id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: userMsg })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setChatHistory(prev => [...prev, { role: 'ai', content: data.answer }]);
+      } else {
+        setChatHistory(prev => [...prev, { role: 'ai', content: `Error: ${data.message}` }]);
+      }
+    } catch (err) {
+      setChatHistory(prev => [...prev, { role: 'ai', content: 'Failed to connect to chat service.' }]);
+    } finally {
+      setIsChatting(false);
     }
   };
 
@@ -243,6 +275,61 @@ const MeetingDetails = () => {
                     </div>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {/* Feature 1: Chat with Meeting */}
+            {meeting.transcriptText && (
+              <section className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <MessageSquare className="w-6 h-6 text-fuchsia-400" />
+                  <h2 className="text-xl font-bold">Chat with this Meeting</h2>
+                </div>
+                
+                <div className="bg-[#0B0F19] rounded-xl border border-white/10 p-4 mb-4 h-64 overflow-y-auto space-y-4">
+                  {chatHistory.length === 0 ? (
+                    <div className="text-center text-gray-500 mt-10">
+                      Ask a question about this meeting (e.g., "What was the budget decision?")
+                    </div>
+                  ) : (
+                    chatHistory.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-xl text-sm ${
+                          msg.role === 'user' 
+                            ? 'bg-indigo-500/20 text-indigo-100 border border-indigo-500/30' 
+                            : 'bg-white/10 text-gray-200 border border-white/10'
+                        }`}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {isChatting && (
+                    <div className="flex justify-start">
+                      <div className="bg-white/10 border border-white/10 text-gray-400 p-3 rounded-xl text-sm flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> AI is thinking...
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleChat} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask anything about the transcript..."
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                    disabled={isChatting}
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={isChatting || !chatInput.trim()}
+                    className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white p-3 rounded-xl transition-colors flex items-center justify-center"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </form>
               </section>
             )}
 

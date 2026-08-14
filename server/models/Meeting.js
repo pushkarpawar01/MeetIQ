@@ -10,6 +10,11 @@ const meetingSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  attendees: [{
+    name: String,
+    email: String,
+    contact: String
+  }],
   date: {
     type: Date,
     default: Date.now,
@@ -21,6 +26,9 @@ const meetingSchema = new mongoose.Schema({
     type: String,
   },
   transcriptUrl: {
+    type: String,
+  },
+  transcriptText: {
     type: String,
   },
   status: {

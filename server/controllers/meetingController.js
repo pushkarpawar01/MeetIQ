@@ -2,11 +2,13 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import Meeting from '../models/Meeting.js';
 import ActionItem from '../models/ActionItem.js';
+import User from '../models/User.js';
 import s3Client from '../config/aws.js';
+import { sendActionItemEmail } from '../utils/mailer.js';
 
 export const getUploadUrl = async (req, res) => {
   try {
-    const { title, filename, contentType } = req.body;
+    const { title, filename, contentType, attendees } = req.body;
     
     if (!title || !filename) {
       return res.status(400).json({ message: 'Title and filename are required' });
@@ -16,7 +18,8 @@ export const getUploadUrl = async (req, res) => {
     const meeting = new Meeting({
       userId: req.user.id,
       title,
-      status: 'UPLOADING'
+      status: 'UPLOADING',
+      attendees: attendees || []
     });
     
     await meeting.save();
@@ -97,7 +100,7 @@ export const getMeetingById = async (req, res) => {
 
 export const meetingWebhook = async (req, res) => {
   try {
-    const { meetingId, status, summary, keyPoints, decisions, risks, unresolvedQuestions, actionItems } = req.body;
+    const { meetingId, status, summary, keyPoints, decisions, risks, unresolvedQuestions, actionItems, transcriptText } = req.body;
 
     const meeting = await Meeting.findById(meetingId);
     if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
@@ -114,11 +117,12 @@ export const meetingWebhook = async (req, res) => {
     meeting.decisions = decisions || [];
     meeting.risks = risks || [];
     meeting.unresolvedQuestions = unresolvedQuestions || [];
+    if (transcriptText) meeting.transcriptText = transcriptText;
     meeting.status = 'COMPLETED';
 
     await meeting.save();
 
-    // Create action items
+    // Create action items and send emails
     if (actionItems && actionItems.length > 0) {
       const itemsToInsert = actionItems.map(item => ({
         meetingId: meeting._id,
@@ -131,6 +135,33 @@ export const meetingWebhook = async (req, res) => {
       }));
       
       await ActionItem.insertMany(itemsToInsert);
+
+      // Feature 4: Fire off emails in the background
+      // Run asynchronously so we don't block the webhook response
+      (async () => {
+        for (const item of itemsToInsert) {
+          if (item.assignedTo && item.assignedTo.toLowerCase() !== 'none') {
+            let emailToSend = item.assignedTo;
+            
+            // If it doesn't look like an email, try looking up the name in the meeting attendees
+            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.assignedTo);
+            if (!isEmail) {
+              const attendee = meeting.attendees.find(a => 
+                a.name && a.name.toLowerCase() === item.assignedTo.toLowerCase()
+              );
+              
+              if (attendee && attendee.email) {
+                emailToSend = attendee.email;
+              } else {
+                console.log(`⚠️ Could not find attendee with name "${item.assignedTo}" (or they have no email) to send action item.`);
+                continue; // Skip if no attendee found
+              }
+            }
+            
+            sendActionItemEmail(emailToSend, item.task, meeting.title);
+          }
+        }
+      })();
     }
 
     res.json({ message: 'Meeting intelligence updated successfully' });
@@ -186,6 +217,60 @@ export const deleteMeeting = async (req, res) => {
     res.json({ message: 'Meeting deleted successfully' });
   } catch (err) {
     console.error('Error deleting meeting:', err);
+    res.status(500).send('Server error');
+  }
+};
+
+export const chatWithMeeting = async (req, res) => {
+  try {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ message: 'Question is required' });
+
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+
+    if (meeting.userId.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    if (!meeting.transcriptText) {
+      return res.status(400).json({ message: 'This meeting does not have a saved transcript for chatting.' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ message: 'GEMINI_API_KEY is not configured on the server.' });
+    }
+
+    // Call Gemini to answer the question based on the transcript
+    const prompt = `You are an AI assistant answering questions about a meeting.
+Answer the user's question accurately using ONLY the information from the meeting transcript below.
+If the answer is not in the transcript, say "I cannot find the answer to that in the meeting transcript."
+
+Transcript:
+${meeting.transcriptText}
+
+Question: ${question}`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    
+    const geminiRes = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+
+    if (!geminiRes.ok) {
+      throw new Error(`Gemini API error: ${geminiRes.status}`);
+    }
+
+    const data = await geminiRes.json();
+    const answer = data.candidates[0].content.parts[0].text;
+
+    res.json({ answer });
+  } catch (err) {
+    console.error('Error in chatWithMeeting:', err);
     res.status(500).send('Server error');
   }
 };

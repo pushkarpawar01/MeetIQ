@@ -137,7 +137,11 @@ ${truncatedTranscript}`;
       console.log("Gemini Intelligence Extracted successfully. Sending to Webhook...");
 
       // 5. Send the final payload to the MeetIQ backend webhook
-      const webhookPayload = { meetingId, ...intelligence };
+      const webhookPayload = { 
+        meetingId, 
+        transcriptText: truncatedTranscript, // Add transcript for RAG chat feature
+        ...intelligence 
+      };
 
       const res = await fetch(WEBHOOK_URL, {
         method: 'POST',
