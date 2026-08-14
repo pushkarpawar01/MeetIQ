@@ -41,14 +41,14 @@ const MeetingDetails = () => {
 
       // Fetch meeting
       const meetRes = await fetchWithAuth(`/api/meetings/${id}`);
-      
+
       if (!meetRes.ok) throw new Error('Failed to fetch meeting');
       const meetData = await meetRes.json();
       setMeeting(meetData);
 
       // Fetch action items
       const actionRes = await fetchWithAuth(`/api/action-items/meeting/${id}`);
-      
+
       if (actionRes.ok) {
         const actionData = await actionRes.json();
         setActionItems(actionData);
@@ -64,7 +64,7 @@ const MeetingDetails = () => {
   const toggleActionStatus = async (item) => {
     try {
       const newStatus = item.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
-      
+
       const res = await fetchWithAuth(`/api/action-items/${item._id}/status`, {
         method: 'PUT',
         headers: {
@@ -96,7 +96,7 @@ const MeetingDetails = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userMsg })
       });
-      
+
       const data = await res.json();
       if (res.ok) {
         setChatHistory(prev => [...prev, { role: 'ai', content: data.answer }]);
@@ -159,10 +159,9 @@ const MeetingDetails = () => {
             <div className="flex items-center gap-4 text-sm text-gray-400">
               <span>{new Date(meeting.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
               <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full text-white text-xs font-medium border border-white/10">
-                <div className={`w-2 h-2 rounded-full ${
-                  meeting.status === 'COMPLETED' ? 'bg-emerald-400' :
-                  meeting.status === 'FAILED' ? 'bg-rose-400' : 'bg-fuchsia-400 animate-pulse'
-                }`}></div>
+                <div className={`w-2 h-2 rounded-full ${meeting.status === 'COMPLETED' ? 'bg-emerald-400' :
+                    meeting.status === 'FAILED' ? 'bg-rose-400' : 'bg-fuchsia-400 animate-pulse'
+                  }`}></div>
                 {meeting.status}
               </span>
             </div>
@@ -185,7 +184,7 @@ const MeetingDetails = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            
+
             {/* Summary Section */}
             {meeting.summary && (
               <section className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
@@ -257,11 +256,10 @@ const MeetingDetails = () => {
                       <button
                         onClick={handleResendEmails}
                         disabled={resendStatus === 'sending'}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                          resendStatus === 'done'
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${resendStatus === 'done'
                             ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
                             : 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400 hover:bg-fuchsia-500/20'
-                        } disabled:opacity-50`}
+                          } disabled:opacity-50`}
                       >
                         {resendStatus === 'sending' ? (
                           <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
@@ -276,15 +274,15 @@ const MeetingDetails = () => {
                       {actionItems.filter(i => i.status === 'COMPLETED').length} / {actionItems.length} Completed
                     </span>
                   </div>
+                </div>
                 <div className="space-y-3">
                   {actionItems.map((item) => (
-                    <div 
-                      key={item._id} 
-                      className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                        item.status === 'COMPLETED' 
-                          ? 'bg-emerald-500/10 border-emerald-500/20' 
+                    <div
+                      key={item._id}
+                      className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer ${item.status === 'COMPLETED'
+                          ? 'bg-emerald-500/10 border-emerald-500/20'
                           : 'bg-white/5 border-white/10 hover:border-indigo-500/50'
-                      }`}
+                        }`}
                       onClick={() => toggleActionStatus(item)}
                     >
                       <button className="mt-1 flex-shrink-0">
@@ -305,10 +303,9 @@ const MeetingDetails = () => {
                           {item.deadline && (
                             <span className="text-gray-400">Due: <strong className="text-gray-300">{item.deadline}</strong></span>
                           )}
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            item.priority === 'High' ? 'bg-rose-500/20 text-rose-400' :
-                            item.priority === 'Medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.priority === 'High' ? 'bg-rose-500/20 text-rose-400' :
+                              item.priority === 'Medium' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'
+                            }`}>
                             {item.priority}
                           </span>
                         </div>
@@ -326,7 +323,7 @@ const MeetingDetails = () => {
                   <MessageSquare className="w-6 h-6 text-fuchsia-400" />
                   <h2 className="text-xl font-bold">Chat with this Meeting</h2>
                 </div>
-                
+
                 <div className="bg-[#0B0F19] rounded-xl border border-white/10 p-4 mb-4 h-64 overflow-y-auto space-y-4">
                   {chatHistory.length === 0 ? (
                     <div className="text-center text-gray-500 mt-10">
@@ -335,11 +332,10 @@ const MeetingDetails = () => {
                   ) : (
                     chatHistory.map((msg, i) => (
                       <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-xl text-sm ${
-                          msg.role === 'user' 
-                            ? 'bg-indigo-500/20 text-indigo-100 border border-indigo-500/30' 
+                        <div className={`max-w-[80%] p-3 rounded-xl text-sm ${msg.role === 'user'
+                            ? 'bg-indigo-500/20 text-indigo-100 border border-indigo-500/30'
                             : 'bg-white/10 text-gray-200 border border-white/10'
-                        }`}>
+                          }`}>
                           {msg.content}
                         </div>
                       </div>
@@ -363,8 +359,8 @@ const MeetingDetails = () => {
                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
                     disabled={isChatting}
                   />
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={isChatting || !chatInput.trim()}
                     className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white p-3 rounded-xl transition-colors flex items-center justify-center"
                   >
