@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, LayoutDashboard, Plus, FileAudio, UploadCloud, X, Loader2, CheckCircle, Clock, Search, Trash2 } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -39,9 +40,7 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return navigate('/login');
-      const res = await fetch('/api/meetings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/meetings');
       if (res.ok) {
         const data = await res.json();
         setMeetings(data);
@@ -71,9 +70,7 @@ const Dashboard = () => {
     setIsSearching(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/meetings/search?query=${encodeURIComponent(q)}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth(`/api/meetings/search?query=${encodeURIComponent(q)}`);
       if (res.ok) setMeetings(await res.json());
     } catch (err) {
       console.error('Error searching:', err);
@@ -98,9 +95,9 @@ const Dashboard = () => {
     setUploadProgress(10);
     const token = localStorage.getItem('token');
     try {
-      const urlRes = await fetch('/api/meetings/upload-url', {
+      const urlRes = await fetchWithAuth('/api/meetings/upload-url', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, filename: file.name, contentType: file.type })
       });
       if (!urlRes.ok) throw new Error('Failed to get upload URL');
@@ -115,9 +112,9 @@ const Dashboard = () => {
       if (!s3Res.ok) throw new Error('Failed to upload to S3');
       setUploadProgress(90);
 
-      await fetch(`/api/meetings/${meetingId}/status`, {
+      await fetchWithAuth(`/api/meetings/${meetingId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'PROCESSING' })
       });
       setUploadProgress(100);
@@ -133,10 +130,8 @@ const Dashboard = () => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/meetings/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetchWithAuth(`/api/meetings/${id}`, {
+        method: 'DELETE'
       });
       if (res.ok) {
         setMeetings(prev => prev.filter(m => m._id !== id));

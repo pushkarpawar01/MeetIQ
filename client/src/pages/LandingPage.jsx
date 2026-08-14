@@ -31,7 +31,7 @@ const LandingPage = () => {
         <div className="text-center max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
             <Sparkles className="w-4 h-4 text-fuchsia-400" />
-            <span className="text-sm font-medium text-gray-300">Powered by Amazon Bedrock</span>
+            <span className="text-sm font-medium text-gray-300">Powered by AI</span>
           </div>
           
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight">
@@ -57,12 +57,12 @@ const LandingPage = () => {
             {
               icon: <Mic className="w-6 h-6 text-indigo-400" />,
               title: "Smart Transcription",
-              desc: "Accurate speech-to-text with automatic language detection using AssemblyAI."
+              desc: "Accurate speech-to-text with automatic language detection and speaker identification."
             },
             {
               icon: <Bot className="w-6 h-6 text-fuchsia-400" />,
               title: "AI Analysis",
-              desc: "Get intelligent summaries, key decisions, and identified risks powered by Amazon Bedrock."
+              desc: "Get intelligent summaries, key decisions, and identified risks powered by advanced AI."
             },
             {
               icon: <CheckCircle2 className="w-6 h-6 text-rose-400" />,

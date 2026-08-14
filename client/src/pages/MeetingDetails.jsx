@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, CheckCircle2, Circle, AlertTriangle, HelpCircle, FileText, LayoutDashboard, Trash2 } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
 
 const MeetingDetails = () => {
   const { id } = useParams();
@@ -13,10 +14,8 @@ const MeetingDetails = () => {
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/meetings/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetchWithAuth(`/api/meetings/${id}`, {
+        method: 'DELETE'
       });
       if (res.ok) {
         navigate('/dashboard');
@@ -37,18 +36,14 @@ const MeetingDetails = () => {
       if (!token) return navigate('/login');
 
       // Fetch meeting
-      const meetRes = await fetch(`/api/meetings/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const meetRes = await fetchWithAuth(`/api/meetings/${id}`);
       
       if (!meetRes.ok) throw new Error('Failed to fetch meeting');
       const meetData = await meetRes.json();
       setMeeting(meetData);
 
       // Fetch action items
-      const actionRes = await fetch(`/api/action-items/meeting/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const actionRes = await fetchWithAuth(`/api/action-items/meeting/${id}`);
       
       if (actionRes.ok) {
         const actionData = await actionRes.json();
@@ -64,14 +59,12 @@ const MeetingDetails = () => {
 
   const toggleActionStatus = async (item) => {
     try {
-      const token = localStorage.getItem('token');
       const newStatus = item.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
       
-      const res = await fetch(`/api/action-items/${item._id}/status`, {
+      const res = await fetchWithAuth(`/api/action-items/${item._id}/status`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: newStatus })
       });
@@ -134,7 +127,7 @@ const MeetingDetails = () => {
             <Loader2 className="w-12 h-12 animate-spin text-fuchsia-500 mx-auto mb-6" />
             <h3 className="text-xl font-semibold mb-3">AI is analyzing your meeting</h3>
             <p className="text-gray-400 max-w-sm mx-auto leading-relaxed">
-              We are transcribing the audio and passing it to Amazon Bedrock to extract summaries, decisions, and action items. This usually takes a few minutes.
+              We are transcribing the audio and using AI to extract summaries, decisions, and action items. This usually takes a few minutes.
             </p>
           </div>
         ) : (

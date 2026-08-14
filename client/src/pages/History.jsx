@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileAudio, Loader2, Clock, Trash2 } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
 
 const History = () => {
   const navigate = useNavigate();
@@ -12,9 +13,7 @@ const History = () => {
       const token = localStorage.getItem('token');
       if (!token) return navigate('/login');
       try {
-        const res = await fetch('/api/meetings', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await fetchWithAuth('/api/meetings');
         if (res.ok) setMeetings(await res.json());
       } catch (e) {
         console.error('Error loading history', e);
@@ -29,10 +28,8 @@ const History = () => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/meetings/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetchWithAuth(`/api/meetings/${id}`, {
+        method: 'DELETE'
       });
       if (res.ok) {
         setMeetings(prev => prev.filter(m => m._id !== id));
