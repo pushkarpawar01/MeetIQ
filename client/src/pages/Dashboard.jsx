@@ -14,9 +14,11 @@ const Dashboard = () => {
   const [isSearching, setIsSearching] = useState(false);
   const fileInputRef = useRef(null);
   const searchTimeout = useRef(null);
+  const pollInterval = useRef(null);
 
   useEffect(() => {
     fetchMeetings();
+    return () => clearInterval(pollInterval.current); // cleanup on unmount
   }, []);
 
   // Debounced search
@@ -40,7 +42,26 @@ const Dashboard = () => {
       const res = await fetch('/api/meetings', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) setMeetings(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data);
+
+        // Auto-poll while any meeting is still processing
+        const hasProcessing = data.some(
+          m => m.status !== 'COMPLETED' && m.status !== 'FAILED'
+        );
+
+        if (hasProcessing) {
+          // Start polling every 5 seconds if not already polling
+          if (!pollInterval.current) {
+            pollInterval.current = setInterval(() => fetchMeetings(), 5000);
+          }
+        } else {
+          // All done — stop polling
+          clearInterval(pollInterval.current);
+          pollInterval.current = null;
+        }
+      }
     } catch (err) {
       console.error('Error fetching meetings:', err);
     }

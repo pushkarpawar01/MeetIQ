@@ -79,15 +79,19 @@ export const handler = async (event) => {
         }
       }
 
-      // Truncate transcript to limit input tokens (free tier has daily limit)
-      const truncatedTranscript = transcriptText.length > 3000
-        ? transcriptText.substring(0, 3000) + "... [truncated]"
+      // Truncate transcript if extremely long (Gemini 1.5 Flash has a massive 1M token context, but we keep it reasonable)
+      const truncatedTranscript = transcriptText.length > 50000
+        ? transcriptText.substring(0, 50000) + "... [truncated]"
         : transcriptText;
 
-      console.log(`Sending ${truncatedTranscript.length} chars to Bedrock...`);
+      console.log(`Sending ${truncatedTranscript.length} chars to Gemini...`);
 
-      // 4. Send Transcript to Amazon Bedrock (Amazon Nova Lite)
-      const prompt = `You are a concise meeting assistant. Analyze this transcript and respond ONLY with a compact raw JSON object in ENGLISH (no markdown, no backticks) with these fields:
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY environment variable is missing. Please add it to Lambda configuration.');
+      }
+
+      // 4. Send Transcript to Google Gemini — model is configurable via GEMINI_MODEL env var
+      const prompt = `You are a concise meeting assistant. Analyze this transcript and respond ONLY with a compact raw JSON object in ENGLISH with these fields:
 - summary: string
 - keyPoints: string[] (max 5 items)
 - decisions: string[] (max 5 items)
@@ -98,49 +102,39 @@ export const handler = async (event) => {
 Transcript:
 ${truncatedTranscript}`;
 
-      // Amazon Nova Lite — current-generation AWS model (Titan Express is deprecated)
-      const bedrockPayload = {
-        messages: [
-          {
-            role: "user",
-            content: [{ text: prompt }]
+      const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite'; // Override via Lambda env var if model is retired
+      console.log(`Using Gemini model: ${geminiModel}`);
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
+      const geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json" // Gemini guarantees valid JSON output!
           }
-        ],
-        inferenceConfig: {
-          maxTokens: 700, // Reduced to stay within free tier daily limits
-          temperature: 0.3,
-          topP: 0.9
-        }
-      };
+        })
+      });
 
-      const bedrockRes = await bedrockClient.send(new InvokeModelCommand({
-        modelId: "us.amazon.nova-lite-v1:0", // us-east-1 cross-region inference profile
-        contentType: "application/json",
-        accept: "application/json",
-        body: JSON.stringify(bedrockPayload)
-      }));
-
-      const bedrockResponseText = new TextDecoder().decode(bedrockRes.body);
-      const bedrockData = JSON.parse(bedrockResponseText);
-      const rawContent = bedrockData.output.message.content[0].text.trim();
-
-      console.log("Bedrock raw output:", rawContent.substring(0, 300));
-
-      // Robust JSON extraction — Titan sometimes wraps output in explanatory text
-      let jsonString = rawContent.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-      if (!jsonString.startsWith('{')) {
-        const match = rawContent.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error('Bedrock did not return a valid JSON object. Raw: ' + rawContent.substring(0, 200));
-        jsonString = match[0];
+      if (!geminiRes.ok) {
+        const errText = await geminiRes.text();
+        throw new Error(`Gemini API error: ${geminiRes.status} ${errText}`);
       }
 
-      const intelligence = JSON.parse(jsonString);
+      const geminiData = await geminiRes.json();
+      const rawContent = geminiData.candidates[0].content.parts[0].text.trim();
+
+      console.log("Gemini raw output:", rawContent.substring(0, 300));
+
+      const intelligence = JSON.parse(rawContent);
 
       if (!intelligence.summary) {
-        throw new Error('Bedrock returned JSON but summary field is missing. Raw: ' + rawContent.substring(0, 200));
+        throw new Error('Gemini returned JSON but summary field is missing. Raw: ' + rawContent.substring(0, 200));
       }
 
-      console.log("Bedrock Intelligence Extracted successfully. Sending to Webhook...");
+      console.log("Gemini Intelligence Extracted successfully. Sending to Webhook...");
 
       // 5. Send the final payload to the MeetIQ backend webhook
       const webhookPayload = { meetingId, ...intelligence };
@@ -164,7 +158,7 @@ ${truncatedTranscript}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meetingId, status: 'FAILED' })
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
