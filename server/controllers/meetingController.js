@@ -6,6 +6,40 @@ import User from '../models/User.js';
 import s3Client from '../config/aws.js';
 import { sendActionItemEmail } from '../utils/mailer.js';
 
+// Shared helper — resolves assignedTo name → attendee email and fires notifications
+const sendEmailsForActionItems = async (items, meeting) => {
+  console.log(`📧 Email task: processing ${items.length} action items for meeting "${meeting.title}"`);
+  console.log(`📋 Meeting has ${(meeting.attendees || []).length} attendees:`, (meeting.attendees || []).map(a => `${a.name} <${a.email}>`));
+
+  for (const item of items) {
+    const name = item.assignedTo;
+    if (!name || name.toLowerCase() === 'none' || name.toLowerCase() === 'tbd') {
+      console.log(`ℹ️  Skipping email — assignedTo is "${name}"`);
+      continue;
+    }
+
+    let emailToSend = name;
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name);
+
+    if (!isEmail) {
+      // Look up name in attendees list (case-insensitive, partial match too)
+      const attendee = (meeting.attendees || []).find(a =>
+        a.name && a.name.toLowerCase().includes(name.toLowerCase())
+      );
+
+      if (attendee && attendee.email) {
+        emailToSend = attendee.email;
+        console.log(`✅ Matched "${name}" → ${emailToSend}`);
+      } else {
+        console.log(`⚠️  No attendee matched "${name}". Available: ${(meeting.attendees || []).map(a => a.name).join(', ') || 'none'}`);
+        continue;
+      }
+    }
+
+    await sendActionItemEmail(emailToSend, item.task, meeting.title);
+  }
+};
+
 export const getUploadUrl = async (req, res) => {
   try {
     const { title, filename, contentType, attendees } = req.body;
@@ -136,32 +170,10 @@ export const meetingWebhook = async (req, res) => {
       
       await ActionItem.insertMany(itemsToInsert);
 
-      // Feature 4: Fire off emails in the background
-      // Run asynchronously so we don't block the webhook response
-      (async () => {
-        for (const item of itemsToInsert) {
-          if (item.assignedTo && item.assignedTo.toLowerCase() !== 'none') {
-            let emailToSend = item.assignedTo;
-            
-            // If it doesn't look like an email, try looking up the name in the meeting attendees
-            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.assignedTo);
-            if (!isEmail) {
-              const attendee = meeting.attendees.find(a => 
-                a.name && a.name.toLowerCase() === item.assignedTo.toLowerCase()
-              );
-              
-              if (attendee && attendee.email) {
-                emailToSend = attendee.email;
-              } else {
-                console.log(`⚠️ Could not find attendee with name "${item.assignedTo}" (or they have no email) to send action item.`);
-                continue; // Skip if no attendee found
-              }
-            }
-            
-            sendActionItemEmail(emailToSend, item.task, meeting.title);
-          }
-        }
-      })();
+      // Fire emails asynchronously — don't block webhook response
+      sendEmailsForActionItems(itemsToInsert, meeting).catch(err =>
+        console.error('Background email error:', err)
+      );
     }
 
     res.json({ message: 'Meeting intelligence updated successfully' });
@@ -288,4 +300,35 @@ Question: ${question}`;
     res.status(500).json({ message: err.message || 'Server error' });
   }
 };
+
+// POST /api/meetings/:id/resend-emails
+// Manually re-trigger action item emails for an existing completed meeting
+export const resendActionEmails = async (req, res) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+
+    if (meeting.userId.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    if (!meeting.attendees || meeting.attendees.length === 0) {
+      return res.status(400).json({ message: 'This meeting has no attendees saved.' });
+    }
+
+    const actionItems = await ActionItem.find({ meetingId: meeting._id });
+    if (actionItems.length === 0) {
+      return res.status(400).json({ message: 'No action items found for this meeting.' });
+    }
+
+    // Re-use the same shared helper
+    await sendEmailsForActionItems(actionItems, meeting);
+
+    res.json({ message: `Emails re-sent for ${actionItems.length} action items.` });
+  } catch (err) {
+    console.error('Error in resendActionEmails:', err);
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+};
+
 

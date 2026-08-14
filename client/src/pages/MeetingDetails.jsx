@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, CheckCircle2, Circle, AlertTriangle, HelpCircle, FileText, LayoutDashboard, Trash2, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Loader2, CheckCircle2, Circle, AlertTriangle, HelpCircle, FileText, LayoutDashboard, Trash2, MessageSquare, Send, Mail, CheckCircle } from 'lucide-react';
 import { fetchWithAuth } from '../utils/api';
 
 const MeetingDetails = () => {
@@ -13,6 +13,7 @@ const MeetingDetails = () => {
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [isChatting, setIsChatting] = useState(false);
+  const [resendStatus, setResendStatus] = useState('idle'); // idle | sending | done | error
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this meeting?')) return;
@@ -106,6 +107,26 @@ const MeetingDetails = () => {
       setChatHistory(prev => [...prev, { role: 'ai', content: `Connection error: ${err.message}` }]);
     } finally {
       setIsChatting(false);
+    }
+  };
+
+  const handleResendEmails = async () => {
+    setResendStatus('sending');
+    try {
+      const res = await fetchWithAuth(`/api/meetings/${id}/resend-emails`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setResendStatus('done');
+        setTimeout(() => setResendStatus('idle'), 3000);
+      } else {
+        alert(`Failed: ${data.message}`);
+        setResendStatus('error');
+        setTimeout(() => setResendStatus('idle'), 3000);
+      }
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+      setResendStatus('error');
+      setTimeout(() => setResendStatus('idle'), 3000);
     }
   };
 
@@ -231,10 +252,30 @@ const MeetingDetails = () => {
               <section className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold">Action Items</h2>
-                  <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-medium">
-                    {actionItems.filter(i => i.status === 'COMPLETED').length} / {actionItems.length} Completed
-                  </span>
-                </div>
+                  <div className="flex items-center gap-2">
+                    {meeting.attendees?.length > 0 && (
+                      <button
+                        onClick={handleResendEmails}
+                        disabled={resendStatus === 'sending'}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                          resendStatus === 'done'
+                            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                            : 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400 hover:bg-fuchsia-500/20'
+                        } disabled:opacity-50`}
+                      >
+                        {resendStatus === 'sending' ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> Sending...</>
+                        ) : resendStatus === 'done' ? (
+                          <><CheckCircle className="w-3 h-3" /> Sent!</>
+                        ) : (
+                          <><Mail className="w-3 h-3" /> Resend Emails</>
+                        )}
+                      </button>
+                    )}
+                    <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-medium">
+                      {actionItems.filter(i => i.status === 'COMPLETED').length} / {actionItems.length} Completed
+                    </span>
+                  </div>
                 <div className="space-y-3">
                   {actionItems.map((item) => (
                     <div 
